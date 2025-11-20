@@ -1,0 +1,9 @@
+[submodule "youtube-webhook-admin-ui"]
+	path = youtube-webhook-admin-ui
+	url = git@github.com:ad-tracker/youtube-webhook-admin-ui.git
+[submodule "youtube-webhook-ingestion-deploy"]
+	path = youtube-webhook-ingestion-deploy
+	url = git@github.com:ad-tracker/youtube-webhook-ingestion-deploy.git
+[submodule "youtube-webhook-ingestion-go"]
+	path = youtube-webhook-ingestion-go
+	url = git@github.com:ad-tracker/youtube-webhook-ingestion-go.git
