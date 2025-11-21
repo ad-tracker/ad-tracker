@@ -6,9 +6,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a monorepo containing three interconnected projects for YouTube webhook ingestion:
 
-- **youtube-webhook-ingestion-go/** - Go backend service (main webhook receiver, API server, enricher worker, renewal service)
-- **youtube-webhook-admin-ui/** - React admin interface for managing subscriptions and viewing webhook data
+- **youtube-webhook-ingestion-go/** - Go backend service (main webhook receiver, API server, enricher worker, renewal service) - Git submodule using `main` branch
+- **youtube-webhook-admin-ui/** - React admin interface for managing subscriptions and viewing webhook data - Git submodule using `master` branch
 - **youtube-webhook-ingestion-deploy/** - Docker Compose deployment configuration with Swag reverse proxy
+
+**Important:** The submodules use different default branches. Adjust git commands accordingly when working within each submodule.
+
+## Quick Reference - Copy-Paste Commands
+
+### Go Project Pre-Commit (youtube-webhook-ingestion-go/)
+```bash
+cd youtube-webhook-ingestion-go && \
+go fmt ./... && \
+go mod tidy && \
+go vet ./... && \
+staticcheck ./... && \
+go test -v -race ./... && \
+go build ./cmd/migrate
+```
+
+### React Project Pre-Commit (youtube-webhook-admin-ui/)
+```bash
+cd youtube-webhook-admin-ui && \
+npm run lint && \
+npm run test:ci && \
+npm run build
+```
+
+### Full Feature Branch Workflow
+```bash
+# Start new feature (adjust branch name for main/master)
+git checkout main && git pull origin main && git checkout -b feature/descriptive-name
+
+# After making changes, run pre-commit checks (see above)
+
+# Commit and push
+git add . && git commit -m "Brief description" && git push -u origin feature/descriptive-name
+
+# Create PR and monitor
+gh pr create --base main --title "Brief description" --body "Detailed description"
+gh pr checks --watch
+```
+
+---
 
 ## Agent Workflow Instructions
 
@@ -46,47 +86,60 @@ Make your code changes following project conventions and architecture patterns.
 
 **For Go projects (youtube-webhook-ingestion-go/):**
 
+Run these checks **in this exact order** (matches CI workflow):
+
 ```bash
 cd youtube-webhook-ingestion-go
 
-# Format all Go code
+# 1. Format all Go code
 go fmt ./...
 
-# Ensure dependencies are clean (if this changes files, commit them)
+# 2. Ensure dependencies are clean (if this changes files, commit them first)
 go mod tidy
 
-# Check for common issues
+# 3. Check for common issues
 go vet ./...
 
-# Run static analysis (install if needed: go install honnef.co/go/tools/cmd/staticcheck@latest)
+# 4. Run static analysis (install if needed: go install honnef.co/go/tools/cmd/staticcheck@latest)
 staticcheck ./...
 
-# Run all tests with race detection (requires Docker for testcontainers)
+# 5. Run all tests with race detection (requires Docker for testcontainers, may take 2-5 minutes)
 go test -v -race ./...
 
-# Verify all builds succeed
-go build ./cmd/server
-go build ./cmd/enricher
-go build ./cmd/renewer
+# 6. Verify build succeeds (CI only validates migrate binary)
 go build ./cmd/migrate
 ```
 
-**Note:** If `go mod tidy` changes `go.mod` or `go.sum`, stage and commit those changes before proceeding. If tests fail due to Docker not running, start Docker and re-run the tests.
+**Important notes:**
+- Run checks in this order to catch failures early and save time
+- If `go mod tidy` changes `go.mod` or `go.sum`, commit those changes before proceeding
+- Docker must be running for tests (testcontainers requirement)
+- Tests typically take 2-5 minutes due to PostgreSQL container initialization
+- CI only validates the `migrate` binary build, not all four binaries
+
+**Expected duration:** 3-7 minutes total (tests take longest)
 
 **For React projects (youtube-webhook-admin-ui/):**
 
 ```bash
 cd youtube-webhook-admin-ui
 
-# Run linting (auto-fixes some issues)
+# 1. Run linting (auto-fixes some issues)
 npm run lint
 
-# Run all tests in CI mode (non-interactive, with coverage)
+# 2. Run all tests in CI mode (non-interactive, with coverage)
 npm run test:ci
 
-# Verify build succeeds
+# 3. Verify build succeeds (includes TypeScript compilation check)
 npm run build
 ```
+
+**Important notes:**
+- Use `npm run test:ci` (CI mode) not `npm run test` (which enters watch mode and hangs)
+- Build step includes TypeScript type checking via `tsc -b`
+- All checks must pass before proceeding
+
+**Expected duration:** 1-3 minutes total
 
 **All pre-commit checks must pass before proceeding.** Fix any linting errors, test failures, or build errors before committing.
 
@@ -171,20 +224,17 @@ gh run view --log-failed
 Before considering work complete, verify these items:
 
 **Pre-commit verification:**
-1. Verify feature branch was created from up-to-date main branch: `git log origin/main..HEAD`
-2. Verify on correct feature branch: `git branch --show-current`
-3. Verify code is properly formatted: `go fmt ./...` or `npm run lint` (should show no changes)
-4. Verify all tests pass locally: `go test -v -race ./...` or `npm run test:ci` (should show all green)
-5. Verify dependencies are clean: `go mod tidy` (should not change files)
-6. Verify static analysis passes: `go vet ./...` and `staticcheck ./...` (Go only)
-7. Verify all builds succeed: `go build ./cmd/...` or `npm run build` (should complete without errors)
+1. `git branch --show-current` - Verify you're on a feature branch (not main/master)
+2. `git log origin/main..HEAD` (or `origin/master..HEAD` for React submodule) - Verify branch diverged from up-to-date default branch
+3. Run all pre-commit checks from section 3 in order - All must pass with no errors
+4. Re-run `go mod tidy` or `npm run lint` - Should show no additional changes (confirms checks were complete)
 
 **Post-commit verification:**
-8. Verify changes committed with clear message: `git log -1`
-9. Verify PR was created successfully: `gh pr view`
-10. Verify all PR CI checks are passing: `gh pr checks` (should show all green checkmarks)
+5. `git log -1` - Verify commit message follows guidelines (imperative mood, clear description)
+6. `gh pr view` - Verify PR was created successfully and has correct title/description
+7. `gh pr checks` or `gh pr checks --watch` - Wait for all CI checks to pass (may take 5-10 minutes)
 
-**Do not consider the task complete until all verification items pass.**
+**Do not consider the task complete until all checks are green.**
 
 ### 7. Common Issues and Solutions
 
@@ -476,6 +526,107 @@ REDIS_URL=redis://:password@redis.example.com:6379/5
 - **renewer** - Automatic subscription renewal service (runs every 6 hours)
 - **admin-ui** - Web interface for management
 
+## Working with Git Submodules
+
+**IMPORTANT:** This monorepo uses Git submodules for the Go and React projects. Understanding the submodule workflow is critical.
+
+### Submodule Basics
+
+When you make changes in a submodule, you need to commit in TWO places:
+1. **Inside the submodule** - Commit your actual code changes
+2. **In the parent repo** - Commit the updated submodule reference
+
+### Submodule Workflow
+
+```bash
+# 1. Navigate into the submodule
+cd youtube-webhook-ingestion-go  # or youtube-webhook-admin-ui
+
+# 2. Check submodule status and branch
+git status
+git branch --show-current
+
+# 3. Ensure you're on the correct branch (main for Go, master for React)
+git checkout main  # or master for React
+
+# 4. Update the submodule's default branch
+git pull origin main  # or origin master for React
+
+# 5. Create feature branch WITHIN the submodule
+git checkout -b feature/my-feature
+
+# 6. Make changes, run pre-commit checks, commit
+# ... follow the standard workflow from section 3 ...
+git add .
+git commit -m "Your commit message"
+
+# 7. Push the submodule branch
+git push -u origin feature/my-feature
+
+# 8. Create PR for the submodule
+gh pr create --base main --title "..." --body "..."  # or --base master for React
+
+# 9. After PR is merged in submodule, update parent repo reference
+cd ..  # Return to parent repo root
+git add youtube-webhook-ingestion-go  # or youtube-webhook-admin-ui
+git commit -m "Update youtube-webhook-ingestion-go submodule to include feature X"
+git push
+```
+
+### Submodule Quick Reference
+
+```bash
+# Check submodule status from parent repo
+git submodule status
+
+# Update all submodules to latest commits on their branches
+git submodule update --remote
+
+# Initialize submodules after fresh clone
+git submodule update --init --recursive
+
+# View uncommitted changes in submodules
+git diff --submodule
+
+# See which commit each submodule points to
+git ls-tree HEAD youtube-webhook-ingestion-go
+git ls-tree HEAD youtube-webhook-admin-ui
+```
+
+**Common submodule pitfall:** Forgetting to commit the submodule reference update in the parent repo after merging a submodule PR. Always remember the two-step commit process.
+
+## When to Use Specialized Agents
+
+This project has specialized agents for Go and React development. Choose the right tool for the task:
+
+### Use the **golang-engineer** agent when:
+- Implementing Go handlers, services, repositories, or middleware
+- Writing Go tests or benchmarks
+- Modifying database migrations
+- Adding new API endpoints to the webhook service
+- Working on enricher, renewer, or migrate commands
+- Working on any code in `youtube-webhook-ingestion-go/`
+
+### Use the **react-developer** agent when:
+- Creating or modifying React components, pages, or layouts
+- Writing React hooks or context providers
+- Implementing React tests with Vitest and React Testing Library
+- Adding new routes or navigation
+- Working with TanStack Query (React Query) for data fetching
+- Working on any code in `youtube-webhook-admin-ui/`
+
+### Use **base Claude Code** (no agent) for:
+- Git operations and branch management (creating branches, merging, rebasing)
+- CI/CD workflow modifications (GitHub Actions YAML files)
+- Docker Compose configuration changes
+- Documentation updates (markdown files, API docs)
+- Cross-project refactoring that touches both Go and React
+- Repository-level configuration (this CLAUDE.md file, .gitignore, etc.)
+- Analyzing logs or debugging build failures
+- General questions about the project structure
+
+**Tip:** When in doubt, specialized agents are better for code changes within their domain. They have project-specific knowledge and enforce quality standards automatically.
+
 ## Development Workflow
 
 ### Working with Git
@@ -520,7 +671,7 @@ PRs must have all checks passing before merge. The PR validation workflow runs:
 **Adding a new React component:**
 1. Create component in `youtube-webhook-admin-ui/src/components/`
 2. Write tests in `__tests__/` subdirectory
-3. Run tests: `npm run test`
+3. Run tests: `npm run test:ci`
 4. Ensure proper TypeScript types
 
 ## Key Dependencies
