@@ -33,10 +33,12 @@ npm run test:ci && \
 npm run build
 ```
 
-### Full Feature Branch Workflow
+### Full Feature Branch Workflow (Using Git Worktrees)
 ```bash
-# Start new feature
-git checkout main && git pull origin main && git checkout -b feature/descriptive-name
+# Start new feature in isolated worktree
+git worktree add ../ad-tracker-feature feature/descriptive-name && \
+cd ../ad-tracker-feature && \
+git submodule update --init --recursive
 
 # After making changes, run pre-commit checks (see above)
 
@@ -46,6 +48,11 @@ git add . && git commit -m "Brief description" && git push -u origin feature/des
 # Create PR and monitor
 gh pr create --base main --title "Brief description" --body "Detailed description"
 gh pr checks --watch
+
+# After PR is merged, return to main worktree and cleanup
+cd /home/justin/workspace/github.com/ad-tracker && \
+git worktree remove ../ad-tracker-feature && \
+git pull origin main
 ```
 
 ---
@@ -59,24 +66,34 @@ When making any code changes, follow this exact workflow:
 ### 1. Before Making Changes
 
 ```bash
-# Check for uncommitted changes (should show clean working tree)
-git status
+# Navigate to main worktree (if not already there)
+cd /home/justin/workspace/github.com/ad-tracker
 
-# Ensure you're on main branch
+# Update the main branch
 git checkout main
-
-# Update the default branch
 git pull origin main
 
-# Create a new feature branch
-git checkout -b feature/descriptive-name
+# Create a new worktree with feature branch
+# Replace 'feature/descriptive-name' with your actual feature name
+git worktree add ../ad-tracker-feature feature/descriptive-name
+
+# Navigate to the new worktree
+cd ../ad-tracker-feature
+
+# Initialize submodules in the new worktree
+git submodule update --init --recursive
+
+# Verify you're on the correct branch
+git branch --show-current
 ```
 
 **Important:**
-- Always commit or stash changes before switching branches
-- Always create a feature branch from an up-to-date default branch
+- Worktrees create isolated working directories for each feature branch
+- Each worktree can run in parallel without conflicts
+- Always initialize submodules after creating a new worktree
 - Use descriptive branch names: `feature/add-channel-api`, `fix/webhook-parsing-bug`, `refactor/improve-error-handling`
 - Never commit directly to `main` or the default branch
+- Recommended worktree naming: `../ad-tracker-[feature-name]` (keeps worktrees organized outside main repo)
 
 ### 2. During Development
 
@@ -234,7 +251,13 @@ Before considering work complete, verify these items:
 6. `gh pr view` - Verify PR was created successfully and has correct title/description
 7. `gh pr checks` or `gh pr checks --watch` - Wait for all CI checks to pass (may take 5-10 minutes)
 
-**Do not consider the task complete until all checks are green.**
+**Post-merge cleanup (worktree specific):**
+8. After PR is merged, return to main worktree: `cd /home/justin/workspace/github.com/ad-tracker`
+9. Remove the feature worktree: `git worktree remove ../ad-tracker-feature`
+10. Update main branch: `git pull origin main`
+11. Verify worktree removed: `git worktree list` (should only show main worktree)
+
+**Do not consider the task complete until all checks are green and the worktree is cleaned up.**
 
 ### 7. Common Issues and Solutions
 
@@ -280,6 +303,33 @@ git push
 **"Docker permission denied (Go tests)"**
 - Linux: Add user to docker group: `sudo usermod -aG docker $USER` (then logout/login)
 - Ensure Docker daemon is running: `docker ps`
+
+**"Submodules not initialized in new worktree"**
+- After creating a worktree, you must initialize submodules: `git submodule update --init --recursive`
+- Verify submodules are present: `ls youtube-webhook-ingestion-go` should show files, not empty
+- Each worktree has independent submodule checkouts
+
+**"How do I list all active worktrees?"**
+- Use `git worktree list` to see all worktrees and their branches
+- Main worktree shows as `[main]` or current branch name
+- Feature worktrees show their branch names and paths
+
+**"How do I remove a worktree?"**
+- First, ensure all changes are committed or you'll lose them
+- From main worktree: `git worktree remove ../ad-tracker-feature`
+- If worktree has uncommitted changes, use `git worktree remove --force ../ad-tracker-feature` (WARNING: loses uncommitted work)
+- Verify removal: `git worktree list`
+
+**"Worktree removal fails with 'main branch is checked out'"**
+- You cannot remove the main worktree (the original clone location)
+- Only remove feature worktrees created with `git worktree add`
+- To clean up the feature branch after removal: `git branch -d feature/name`
+
+**"Can I have multiple agents working on different worktrees simultaneously?"**
+- Yes! This is the primary benefit of worktrees
+- Each worktree is isolated with its own working directory, index, and submodule checkouts
+- Example: Run golang-engineer in `../ad-tracker-golang` and react-developer in `../ad-tracker-react` at the same time
+- Ensure different ports if running dev servers: configure via environment variables
 
 ## Go Service (youtube-webhook-ingestion-go/)
 
@@ -536,42 +586,62 @@ When you make changes in a submodule, you need to commit in TWO places:
 1. **Inside the submodule** - Commit your actual code changes
 2. **In the parent repo** - Commit the updated submodule reference
 
-### Submodule Workflow
+### Submodule Workflow with Worktrees
+
+**Important:** When using worktrees, submodules are automatically isolated per worktree. You work on submodules within each worktree's context.
 
 ```bash
-# 1. Navigate into the submodule
+# Workflow when making changes to a submodule:
+
+# 1. Create parent repo worktree (if not already done)
+cd /home/justin/workspace/github.com/ad-tracker
+git worktree add ../ad-tracker-feature feature/my-feature
+cd ../ad-tracker-feature
+git submodule update --init --recursive
+
+# 2. Navigate into the submodule within the worktree
 cd youtube-webhook-ingestion-go  # or youtube-webhook-admin-ui
 
-# 2. Check submodule status and branch
+# 3. Check submodule status
 git status
 git branch --show-current
 
-# 3. Ensure you're on the main branch
+# 4. Create feature branch WITHIN the submodule
+# The submodule has its own git repository, independent of the worktree
 git checkout main
-
-# 4. Update the submodule's main branch
 git pull origin main
+git checkout -b feature/submodule-feature
 
-# 5. Create feature branch WITHIN the submodule
-git checkout -b feature/my-feature
-
-# 6. Make changes, run pre-commit checks, commit
+# 5. Make changes, run pre-commit checks, commit
 # ... follow the standard workflow from section 3 ...
 git add .
 git commit -m "Your commit message"
 
-# 7. Push the submodule branch
-git push -u origin feature/my-feature
+# 6. Push the submodule branch
+git push -u origin feature/submodule-feature
 
-# 8. Create PR for the submodule
+# 7. Create PR for the submodule
 gh pr create --base main --title "..." --body "..."
 
-# 9. After PR is merged in submodule, update parent repo reference
-cd ..  # Return to parent repo root
-git add youtube-webhook-ingestion-go  # or youtube-webhook-admin-ui
+# 8. After submodule PR is merged, update parent repo reference
+cd ..  # Return to worktree root
+git checkout main
+git pull origin main
+git submodule update --remote youtube-webhook-ingestion-go
+git add youtube-webhook-ingestion-go
 git commit -m "Update youtube-webhook-ingestion-go submodule to include feature X"
 git push
+
+# 9. Clean up the worktree
+cd /home/justin/workspace/github.com/ad-tracker
+git worktree remove ../ad-tracker-feature
 ```
+
+**Key Points:**
+- Each worktree has independent submodule checkouts
+- Submodules within worktrees have their own branches and can be on different commits
+- After merging a submodule PR, update the parent repo's submodule reference
+- The two-step commit process (submodule + parent repo) still applies with worktrees
 
 ### Submodule Quick Reference
 
