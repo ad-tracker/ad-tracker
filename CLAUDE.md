@@ -19,11 +19,13 @@ When making any code changes, follow this exact workflow:
 ### 1. Before Making Changes
 
 ```bash
-# Get the default branch name
-git remote show origin | grep "HEAD branch"
+# Check for uncommitted changes (should show clean working tree)
+git status
 
-# Checkout and update the default branch (usually 'main')
+# Ensure you're on main branch
 git checkout main
+
+# Update the default branch
 git pull origin main
 
 # Create a new feature branch
@@ -31,6 +33,7 @@ git checkout -b feature/descriptive-name
 ```
 
 **Important:**
+- Always commit or stash changes before switching branches
 - Always create a feature branch from an up-to-date default branch
 - Use descriptive branch names: `feature/add-channel-api`, `fix/webhook-parsing-bug`, `refactor/improve-error-handling`
 - Never commit directly to `main` or the default branch
@@ -49,43 +52,54 @@ cd youtube-webhook-ingestion-go
 # Format all Go code
 go fmt ./...
 
-# Ensure dependencies are clean
+# Ensure dependencies are clean (if this changes files, commit them)
 go mod tidy
 
-# Run all tests with race detection
+# Check for common issues
+go vet ./...
+
+# Run static analysis (install if needed: go install honnef.co/go/tools/cmd/staticcheck@latest)
+staticcheck ./...
+
+# Run all tests with race detection (requires Docker for testcontainers)
 go test -v -race ./...
 
-# Verify build succeeds
+# Verify all builds succeed
 go build ./cmd/server
 go build ./cmd/enricher
 go build ./cmd/renewer
 go build ./cmd/migrate
 ```
 
+**Note:** If `go mod tidy` changes `go.mod` or `go.sum`, stage and commit those changes before proceeding. If tests fail due to Docker not running, start Docker and re-run the tests.
+
 **For React projects (youtube-webhook-admin-ui/):**
 
 ```bash
 cd youtube-webhook-admin-ui
 
-# Run linting
+# Run linting (auto-fixes some issues)
 npm run lint
 
-# Run all tests
+# Run all tests in CI mode (non-interactive, with coverage)
 npm run test:ci
 
 # Verify build succeeds
 npm run build
 ```
 
-**All pre-commit checks must pass before proceeding.**
+**All pre-commit checks must pass before proceeding.** Fix any linting errors, test failures, or build errors before committing.
 
 ### 4. Committing and Opening PR
 
 ```bash
+# Verify you're on the feature branch
+git branch --show-current
+
 # Stage all changes
 git add .
 
-# Commit with descriptive message
+# Commit with descriptive message (use clear, imperative mood)
 git commit -m "Brief description of changes
 
 Longer explanation if needed:
@@ -96,22 +110,39 @@ Longer explanation if needed:
 # Push the feature branch
 git push -u origin feature/descriptive-name
 
-# Open a pull request using GitHub CLI
-gh pr create --title "Brief description" --body "Detailed description of changes"
+# Verify push succeeded
+git status
+
+# Open a pull request using GitHub CLI (targets main by default)
+gh pr create --base main --title "Brief description" --body "Detailed description of changes"
 ```
+
+**Commit message guidelines:**
+- Use imperative mood: "Add feature" not "Added feature"
+- First line should be concise (50 chars or less)
+- Add detailed explanation after a blank line if needed
 
 ### 5. After PR Creation
 
 ```bash
-# Check PR status and CI checks
+# Verify PR was created successfully and view details
 gh pr view
 
-# Monitor CI checks until they all pass
+# Check status of CI checks
 gh pr checks
 
-# If checks fail, review the output:
+# If checks are running, watch them in real-time
 gh pr checks --watch
+
+# If a check fails, view the detailed logs for that check
+gh run view --log-failed
 ```
+
+**Monitoring PR checks:**
+- `gh pr view` - Shows PR details, description, and status
+- `gh pr checks` - Lists all checks with their current status
+- `gh pr checks --watch` - Live updates as checks run (use Ctrl+C to exit)
+- `gh run view --log-failed` - Shows detailed failure logs from GitHub Actions
 
 **Required PR checks:**
 - Code formatting (`go fmt`, linting)
@@ -122,49 +153,83 @@ gh pr checks --watch
 - Static analysis (`go vet`, `staticcheck` for Go)
 
 **If any check fails:**
-1. Fix the issue locally
-2. Run the relevant pre-commit checks again
-3. Commit and push the fix: `git add . && git commit -m "Fix: description" && git push`
-4. Wait for checks to run again
-5. Repeat until all checks pass
+1. Review the failure logs: `gh run view --log-failed`
+2. Fix the issue locally (re-run the relevant pre-commit checks)
+3. If `go mod tidy` made changes, stage them: `git add go.mod go.sum`
+4. Commit and push the fix: `git add . && git commit -m "Fix: description" && git push`
+5. Monitor checks again: `gh pr checks --watch`
+6. Repeat until all checks pass
+
+**Common check failures and fixes:**
+- **Formatting check fails:** Run `go fmt ./...` or `npm run lint`, then commit changes
+- **Tests fail:** Review test output with `gh run view --log-failed`, fix the code, verify locally with `go test -v ./...` or `npm run test:ci`
+- **Build fails:** Verify locally with `go build ./cmd/...` or `npm run build`, fix errors, then commit
+- **Dependencies check fails:** Run `go mod tidy`, commit the changes to `go.mod` and `go.sum`
 
 ### 6. Verification Checklist
 
-Before considering work complete, verify:
-- [ ] Feature branch created from up-to-date default branch
-- [ ] All code properly formatted (`go fmt ./...` or `npm run lint`)
-- [ ] All tests passing locally (`go test -race ./...` or `npm run test:ci`)
-- [ ] Dependencies are clean (`go mod tidy` for Go)
-- [ ] Code builds successfully
-- [ ] Changes committed with clear message
-- [ ] PR created with descriptive title and body
-- [ ] All PR CI checks passing (green checkmarks)
+Before considering work complete, verify these items:
 
-**Do not consider the task complete until all checklist items are verified.**
+**Pre-commit verification:**
+1. Verify feature branch was created from up-to-date main branch: `git log origin/main..HEAD`
+2. Verify on correct feature branch: `git branch --show-current`
+3. Verify code is properly formatted: `go fmt ./...` or `npm run lint` (should show no changes)
+4. Verify all tests pass locally: `go test -v -race ./...` or `npm run test:ci` (should show all green)
+5. Verify dependencies are clean: `go mod tidy` (should not change files)
+6. Verify static analysis passes: `go vet ./...` and `staticcheck ./...` (Go only)
+7. Verify all builds succeed: `go build ./cmd/...` or `npm run build` (should complete without errors)
+
+**Post-commit verification:**
+8. Verify changes committed with clear message: `git log -1`
+9. Verify PR was created successfully: `gh pr view`
+10. Verify all PR CI checks are passing: `gh pr checks` (should show all green checkmarks)
+
+**Do not consider the task complete until all verification items pass.**
 
 ### 7. Common Issues and Solutions
 
 **"Tests are failing locally"**
-- Ensure Docker is running (required for testcontainers in Go tests)
-- Check that all required environment variables are set
-- Review test output for specific errors
+- **Go tests:** Ensure Docker is running (required for testcontainers). Start Docker Desktop or `systemctl start docker`
+- Check that all required environment variables are set (see "Running Services" section)
+- Run specific failing test with verbose output: `go test -v ./path/to/package -run TestName`
+- Review detailed test output for error messages and stack traces
+- For React tests, try clearing cache: `npm run test:ci -- --clearCache`
 
 **"PR checks failing but local tests pass"**
-- Ensure branch is up-to-date: `git pull origin main` then `git push`
-- Check for formatting issues: `go fmt ./...` or `npm run lint`
+- Ensure branch is up-to-date with main: `git pull origin main` then resolve any conflicts and `git push`
+- Check for formatting issues: `go fmt ./...` or `npm run lint` (commit any changes)
 - Verify `go.mod` and `go.sum` are committed after `go mod tidy`
+- Check the actual CI logs with: `gh run view --log-failed`
+- Ensure you ran the exact same commands locally (e.g., `go test -v -race ./...` not just `go test ./...`)
 
 **"Merge conflicts with main"**
 ```bash
+# Update main branch first
 git checkout main
 git pull origin main
+
+# Switch back to feature branch and merge
 git checkout feature/your-branch
 git merge main
-# Resolve conflicts, then:
+
+# Resolve conflicts manually, then:
 git add .
 git commit -m "Merge main into feature branch"
 git push
 ```
+
+**"go mod tidy keeps changing files"**
+- This is normal if dependencies were added/removed
+- Review the changes with `git diff go.mod go.sum`
+- Stage and commit them: `git add go.mod go.sum && git commit -m "Update dependencies"`
+
+**"staticcheck not found"**
+- Install it: `go install honnef.co/go/tools/cmd/staticcheck@latest`
+- Ensure `$GOPATH/bin` or `$HOME/go/bin` is in your PATH
+
+**"Docker permission denied (Go tests)"**
+- Linux: Add user to docker group: `sudo usermod -aG docker $USER` (then logout/login)
+- Ensure Docker daemon is running: `docker ps`
 
 ## Go Service (youtube-webhook-ingestion-go/)
 
@@ -190,7 +255,7 @@ go build ./cmd/migrate
 # Run all tests (requires Docker for testcontainers)
 go test ./...
 
-# Run with verbose output and race detection
+# Run with verbose output and race detection (recommended for pre-commit)
 go test -v -race -coverprofile=coverage.out ./...
 
 # Run tests for specific package
@@ -198,7 +263,12 @@ go test -v ./internal/db/repository
 
 # Run a specific test
 go test -v ./internal/db/repository -run TestWebhookEventRepository_CreateWebhookEvent
+
+# View coverage report
+go tool cover -html=coverage.out
 ```
+
+**Note:** Integration tests use testcontainers which require Docker to be running. If Docker is not available, tests will fail with connection errors.
 
 ### Code Quality
 
@@ -229,6 +299,8 @@ go run ./cmd/migrate -direction down
 # With custom database URL
 go run ./cmd/migrate -db "postgres://user:password@localhost:5432/youtube_webhooks?sslmode=disable" -direction up
 ```
+
+**⚠️ IMPORTANT:** Always test migrations on a development database first. Create a backup before running migrations on production. Verify that rollback (down migration) works correctly before deploying to production.
 
 ### Running Services
 
@@ -300,10 +372,10 @@ npm run preview
 npm run lint
 
 # Testing
-npm run test              # Watch mode
-npm run test:ui           # With UI
-npm run test:coverage     # With coverage report
-npm run test:ci           # CI mode (no watch, with coverage)
+npm run test              # Watch mode (interactive)
+npm run test:ui           # With UI (interactive browser)
+npm run test:coverage     # With coverage report (interactive)
+npm run test:ci           # CI mode (non-interactive, with coverage - use for pre-commit checks)
 ```
 
 ### Architecture Overview
