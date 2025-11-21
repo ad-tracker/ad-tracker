@@ -10,6 +10,162 @@ This is a monorepo containing three interconnected projects for YouTube webhook 
 - **youtube-webhook-admin-ui/** - React admin interface for managing subscriptions and viewing webhook data
 - **youtube-webhook-ingestion-deploy/** - Docker Compose deployment configuration with Swag reverse proxy
 
+## Agent Workflow Instructions
+
+**CRITICAL: Follow this workflow for ALL code changes. This is mandatory.**
+
+When making any code changes, follow this exact workflow:
+
+### 1. Before Making Changes
+
+```bash
+# Get the default branch name
+git remote show origin | grep "HEAD branch"
+
+# Checkout and update the default branch (usually 'main')
+git checkout main
+git pull origin main
+
+# Create a new feature branch
+git checkout -b feature/descriptive-name
+```
+
+**Important:**
+- Always create a feature branch from an up-to-date default branch
+- Use descriptive branch names: `feature/add-channel-api`, `fix/webhook-parsing-bug`, `refactor/improve-error-handling`
+- Never commit directly to `main` or the default branch
+
+### 2. During Development
+
+Make your code changes following project conventions and architecture patterns.
+
+### 3. Before Committing
+
+**For Go projects (youtube-webhook-ingestion-go/):**
+
+```bash
+cd youtube-webhook-ingestion-go
+
+# Format all Go code
+go fmt ./...
+
+# Ensure dependencies are clean
+go mod tidy
+
+# Run all tests with race detection
+go test -v -race ./...
+
+# Verify build succeeds
+go build ./cmd/server
+go build ./cmd/enricher
+go build ./cmd/renewer
+go build ./cmd/migrate
+```
+
+**For React projects (youtube-webhook-admin-ui/):**
+
+```bash
+cd youtube-webhook-admin-ui
+
+# Run linting
+npm run lint
+
+# Run all tests
+npm run test:ci
+
+# Verify build succeeds
+npm run build
+```
+
+**All pre-commit checks must pass before proceeding.**
+
+### 4. Committing and Opening PR
+
+```bash
+# Stage all changes
+git add .
+
+# Commit with descriptive message
+git commit -m "Brief description of changes
+
+Longer explanation if needed:
+- Key change 1
+- Key change 2
+- Fixes issue #123 (if applicable)"
+
+# Push the feature branch
+git push -u origin feature/descriptive-name
+
+# Open a pull request using GitHub CLI
+gh pr create --title "Brief description" --body "Detailed description of changes"
+```
+
+### 5. After PR Creation
+
+```bash
+# Check PR status and CI checks
+gh pr view
+
+# Monitor CI checks until they all pass
+gh pr checks
+
+# If checks fail, review the output:
+gh pr checks --watch
+```
+
+**Required PR checks:**
+- Code formatting (`go fmt`, linting)
+- Dependency validation (`go mod tidy`)
+- All tests passing with race detection
+- Build verification
+- Code coverage (must not decrease significantly)
+- Static analysis (`go vet`, `staticcheck` for Go)
+
+**If any check fails:**
+1. Fix the issue locally
+2. Run the relevant pre-commit checks again
+3. Commit and push the fix: `git add . && git commit -m "Fix: description" && git push`
+4. Wait for checks to run again
+5. Repeat until all checks pass
+
+### 6. Verification Checklist
+
+Before considering work complete, verify:
+- [ ] Feature branch created from up-to-date default branch
+- [ ] All code properly formatted (`go fmt ./...` or `npm run lint`)
+- [ ] All tests passing locally (`go test -race ./...` or `npm run test:ci`)
+- [ ] Dependencies are clean (`go mod tidy` for Go)
+- [ ] Code builds successfully
+- [ ] Changes committed with clear message
+- [ ] PR created with descriptive title and body
+- [ ] All PR CI checks passing (green checkmarks)
+
+**Do not consider the task complete until all checklist items are verified.**
+
+### 7. Common Issues and Solutions
+
+**"Tests are failing locally"**
+- Ensure Docker is running (required for testcontainers in Go tests)
+- Check that all required environment variables are set
+- Review test output for specific errors
+
+**"PR checks failing but local tests pass"**
+- Ensure branch is up-to-date: `git pull origin main` then `git push`
+- Check for formatting issues: `go fmt ./...` or `npm run lint`
+- Verify `go.mod` and `go.sum` are committed after `go mod tidy`
+
+**"Merge conflicts with main"**
+```bash
+git checkout main
+git pull origin main
+git checkout feature/your-branch
+git merge main
+# Resolve conflicts, then:
+git add .
+git commit -m "Merge main into feature branch"
+git push
+```
+
 ## Go Service (youtube-webhook-ingestion-go/)
 
 ### Build Commands
