@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a monorepo containing three interconnected projects for YouTube webhook ingestion:
 
 - **youtube-webhook-ingestion-go/** - Go backend service (main webhook receiver, API server, enricher worker, renewal service) - Git submodule using `main` branch
-- **youtube-webhook-admin-ui/** - React admin interface for managing subscriptions and viewing webhook data - Git submodule using `master` branch
+- **youtube-webhook-admin-ui/** - React admin interface for managing subscriptions and viewing webhook data - Git submodule using `main` branch
 - **youtube-webhook-ingestion-deploy/** - Docker Compose deployment configuration with Swag reverse proxy
 
-**Important:** The submodules use different default branches. Adjust git commands accordingly when working within each submodule.
+**Important:** All submodules use `main` as the default branch.
 
 ## Quick Reference - Copy-Paste Commands
 
@@ -35,7 +35,7 @@ npm run build
 
 ### Full Feature Branch Workflow
 ```bash
-# Start new feature (adjust branch name for main/master)
+# Start new feature
 git checkout main && git pull origin main && git checkout -b feature/descriptive-name
 
 # After making changes, run pre-commit checks (see above)
@@ -224,8 +224,8 @@ gh run view --log-failed
 Before considering work complete, verify these items:
 
 **Pre-commit verification:**
-1. `git branch --show-current` - Verify you're on a feature branch (not main/master)
-2. `git log origin/main..HEAD` (or `origin/master..HEAD` for React submodule) - Verify branch diverged from up-to-date default branch
+1. `git branch --show-current` - Verify you're on a feature branch (not main)
+2. `git log origin/main..HEAD` - Verify branch diverged from up-to-date main branch
 3. Run all pre-commit checks from section 3 in order - All must pass with no errors
 4. Re-run `go mod tidy` or `npm run lint` - Should show no additional changes (confirms checks were complete)
 
@@ -546,11 +546,11 @@ cd youtube-webhook-ingestion-go  # or youtube-webhook-admin-ui
 git status
 git branch --show-current
 
-# 3. Ensure you're on the correct branch (main for Go, master for React)
-git checkout main  # or master for React
+# 3. Ensure you're on the main branch
+git checkout main
 
-# 4. Update the submodule's default branch
-git pull origin main  # or origin master for React
+# 4. Update the submodule's main branch
+git pull origin main
 
 # 5. Create feature branch WITHIN the submodule
 git checkout -b feature/my-feature
@@ -564,7 +564,7 @@ git commit -m "Your commit message"
 git push -u origin feature/my-feature
 
 # 8. Create PR for the submodule
-gh pr create --base main --title "..." --body "..."  # or --base master for React
+gh pr create --base main --title "..." --body "..."
 
 # 9. After PR is merged in submodule, update parent repo reference
 cd ..  # Return to parent repo root
