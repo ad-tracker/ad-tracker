@@ -2,6 +2,34 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL: NEVER EDIT MAIN WORKTREE FILES
+
+**FOR ALL AGENTS: You MUST work in isolated worktrees, NEVER in the main repository.**
+
+- **Main worktree location:** `/home/justin/workspace/github.com/ad-tracker/`
+- **Agent worktree location:** `/home/justin/workspace/github.com/ad-tracker/worktrees/`
+
+**BEFORE making ANY code changes, verify your current directory:**
+```bash
+pwd  # Must show: /home/justin/workspace/github.com/ad-tracker/worktrees/[your-worktree]
+```
+
+**If you are in `/home/justin/workspace/github.com/ad-tracker/` (main worktree), STOP immediately and create a worktree first.**
+
+**Why this matters:**
+- The main worktree should remain clean and only updated via git pull
+- All development work happens in isolated worktrees under `/worktrees/`
+- Multiple agents can work in parallel without conflicts
+- Changes are only merged to main via Pull Requests after all checks pass
+
+**Mandatory verification before editing ANY files:**
+```bash
+# This command will exit with error if you're not in a worktree
+pwd | grep -q "/worktrees/" || { echo "❌ ERROR: Not in worktree! You must create a worktree first."; exit 1; }
+```
+
+---
+
 ## Repository Structure
 
 This is a monorepo containing three interconnected projects for YouTube webhook ingestion:
@@ -35,10 +63,16 @@ npm run build
 
 ### Full Feature Branch Workflow (Using Git Worktrees)
 ```bash
-# Start new feature in isolated worktree
-git worktree add ../ad-tracker-feature feature/descriptive-name && \
-cd ../ad-tracker-feature && \
+# IMPORTANT: Navigate to main worktree first
+cd /home/justin/workspace/github.com/ad-tracker
+
+# Start new feature in isolated worktree (inside worktrees/ folder)
+git worktree add worktrees/feature-name feature/descriptive-name && \
+cd worktrees/feature-name && \
 git submodule update --init --recursive
+
+# Verify you're in the correct location (MANDATORY)
+pwd | grep -q "/worktrees/" || { echo "❌ ERROR: Not in worktree!"; exit 1; }
 
 # After making changes, run pre-commit checks (see above)
 
@@ -51,7 +85,7 @@ gh pr checks --watch
 
 # After PR is merged, return to main worktree and cleanup
 cd /home/justin/workspace/github.com/ad-tracker && \
-git worktree remove ../ad-tracker-feature && \
+git worktree remove worktrees/feature-name && \
 git pull origin main
 ```
 
@@ -73,29 +107,40 @@ cd /home/justin/workspace/github.com/ad-tracker
 git checkout main
 git pull origin main
 
-# Create a new worktree with feature branch
-# Replace 'feature/descriptive-name' with your actual feature name
-git worktree add ../ad-tracker-feature feature/descriptive-name
+# Create a new worktree with feature branch inside worktrees/ folder
+# Replace 'feature-name' with a descriptive name (no spaces)
+git worktree add worktrees/feature-name feature/descriptive-name
 
 # Navigate to the new worktree
-cd ../ad-tracker-feature
+cd worktrees/feature-name
 
 # Initialize submodules in the new worktree
 git submodule update --init --recursive
+
+# MANDATORY: Verify you're in a worktree, not main repo
+pwd | grep -q "/worktrees/" || { echo "❌ ERROR: Not in worktree!"; exit 1; }
 
 # Verify you're on the correct branch
 git branch --show-current
 ```
 
 **Important:**
+- **NEVER edit files in `/home/justin/workspace/github.com/ad-tracker/` (main worktree)**
+- **ALWAYS work in `/home/justin/workspace/github.com/ad-tracker/worktrees/[your-worktree]/`**
 - Worktrees create isolated working directories for each feature branch
 - Each worktree can run in parallel without conflicts
 - Always initialize submodules after creating a new worktree
 - Use descriptive branch names: `feature/add-channel-api`, `fix/webhook-parsing-bug`, `refactor/improve-error-handling`
 - Never commit directly to `main` or the default branch
-- Recommended worktree naming: `../ad-tracker-[feature-name]` (keeps worktrees organized outside main repo)
+- Worktree naming: `worktrees/feature-name` (all worktrees stored in organized `/worktrees/` folder)
 
 ### 2. During Development
+
+**BEFORE editing any files, verify you're in a worktree:**
+```bash
+# MANDATORY: Run this before making any code changes
+pwd | grep -q "/worktrees/" || { echo "❌ ERROR: Not in worktree! You must be in /worktrees/ directory."; exit 1; }
+```
 
 Make your code changes following project conventions and architecture patterns.
 
@@ -241,21 +286,22 @@ gh run view --log-failed
 Before considering work complete, verify these items:
 
 **Pre-commit verification:**
-1. `git branch --show-current` - Verify you're on a feature branch (not main)
-2. `git log origin/main..HEAD` - Verify branch diverged from up-to-date main branch
-3. Run all pre-commit checks from section 3 in order - All must pass with no errors
-4. Re-run `go mod tidy` or `npm run lint` - Should show no additional changes (confirms checks were complete)
+1. `pwd | grep -q "/worktrees/"` - **CRITICAL: Verify you're in a worktree, not main repo**
+2. `git branch --show-current` - Verify you're on a feature branch (not main)
+3. `git log origin/main..HEAD` - Verify branch diverged from up-to-date main branch
+4. Run all pre-commit checks from section 3 in order - All must pass with no errors
+5. Re-run `go mod tidy` or `npm run lint` - Should show no additional changes (confirms checks were complete)
 
 **Post-commit verification:**
-5. `git log -1` - Verify commit message follows guidelines (imperative mood, clear description)
-6. `gh pr view` - Verify PR was created successfully and has correct title/description
-7. `gh pr checks` or `gh pr checks --watch` - Wait for all CI checks to pass (may take 5-10 minutes)
+6. `git log -1` - Verify commit message follows guidelines (imperative mood, clear description)
+7. `gh pr view` - Verify PR was created successfully and has correct title/description
+8. `gh pr checks` or `gh pr checks --watch` - Wait for all CI checks to pass (may take 5-10 minutes)
 
 **Post-merge cleanup (worktree specific):**
-8. After PR is merged, return to main worktree: `cd /home/justin/workspace/github.com/ad-tracker`
-9. Remove the feature worktree: `git worktree remove ../ad-tracker-feature`
-10. Update main branch: `git pull origin main`
-11. Verify worktree removed: `git worktree list` (should only show main worktree)
+9. After PR is merged, return to main worktree: `cd /home/justin/workspace/github.com/ad-tracker`
+10. Remove the feature worktree: `git worktree remove worktrees/feature-name`
+11. Update main branch: `git pull origin main`
+12. Verify worktree removed: `git worktree list` (should only show main worktree)
 
 **Do not consider the task complete until all checks are green and the worktree is cleaned up.**
 
@@ -316,8 +362,8 @@ git push
 
 **"How do I remove a worktree?"**
 - First, ensure all changes are committed or you'll lose them
-- From main worktree: `git worktree remove ../ad-tracker-feature`
-- If worktree has uncommitted changes, use `git worktree remove --force ../ad-tracker-feature` (WARNING: loses uncommitted work)
+- From main worktree: `git worktree remove worktrees/feature-name`
+- If worktree has uncommitted changes, use `git worktree remove --force worktrees/feature-name` (WARNING: loses uncommitted work)
 - Verify removal: `git worktree list`
 
 **"Worktree removal fails with 'main branch is checked out'"**
@@ -328,7 +374,8 @@ git push
 **"Can I have multiple agents working on different worktrees simultaneously?"**
 - Yes! This is the primary benefit of worktrees
 - Each worktree is isolated with its own working directory, index, and submodule checkouts
-- Example: Run golang-engineer in `../ad-tracker-golang` and react-developer in `../ad-tracker-react` at the same time
+- Example: Run golang-engineer in `worktrees/golang-work` and react-developer in `worktrees/react-work` at the same time
+- All worktrees are in `/home/justin/workspace/github.com/ad-tracker/worktrees/` folder
 - Ensure different ports if running dev servers: configure via environment variables
 
 ## Go Service (youtube-webhook-ingestion-go/)
@@ -595,9 +642,12 @@ When you make changes in a submodule, you need to commit in TWO places:
 
 # 1. Create parent repo worktree (if not already done)
 cd /home/justin/workspace/github.com/ad-tracker
-git worktree add ../ad-tracker-feature feature/my-feature
-cd ../ad-tracker-feature
+git worktree add worktrees/feature-name feature/my-feature
+cd worktrees/feature-name
 git submodule update --init --recursive
+
+# MANDATORY: Verify you're in a worktree
+pwd | grep -q "/worktrees/" || { echo "❌ ERROR: Not in worktree!"; exit 1; }
 
 # 2. Navigate into the submodule within the worktree
 cd youtube-webhook-ingestion-go  # or youtube-webhook-admin-ui
@@ -634,7 +684,7 @@ git push
 
 # 9. Clean up the worktree
 cd /home/justin/workspace/github.com/ad-tracker
-git worktree remove ../ad-tracker-feature
+git worktree remove worktrees/feature-name
 ```
 
 **Key Points:**

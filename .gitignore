@@ -19,3 +19,6 @@ Thumbs.db
 # Backup directories (used during submodule conversion)
 *-backup/
 *-git-backup/
+
+# Git worktrees - agents work here, never in main repo
+/worktrees/
